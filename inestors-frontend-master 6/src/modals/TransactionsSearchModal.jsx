@@ -1,0 +1,237 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Box,
+  IconButton,
+  TextField,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
+  Autocomplete
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+
+  const TransactionsSearchModal = ({ open, onClose, onSearch, transactions }) => {
+  const [filters, setFilters] = useState({
+    type: '',
+    minAmount: '',
+    maxAmount: '',
+    startDate: null,
+    endDate: null,
+    year: null,
+    periodName: null,
+    status: null
+  });
+
+  const [financialYears, setFinancialYears] = useState([]);
+
+  // استخراج السنوات المالية الفريدة من البيانات
+  useEffect(() => {
+    if (transactions && transactions.length > 0) {
+      const yearsMap = new Map();
+      
+      transactions.forEach(transaction => {
+        if (transaction.financialYear) {
+          const key = `${transaction.financialYear.year}-${transaction.financialYear.periodName}`;
+          if (!yearsMap.has(key)) {
+            yearsMap.set(key, {
+              year: transaction.financialYear.year,
+              periodName: transaction.financialYear.periodName
+            });
+          }
+        }
+      });
+      
+      setFinancialYears(Array.from(yearsMap.values()));
+    }
+  }, [transactions]);
+
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSearch = () => {
+    const searchFilters = {};
+    
+    if (filters.type) searchFilters.type = filters.type;
+    if (filters.minAmount) searchFilters.minAmount = filters.minAmount;
+    if (filters.maxAmount) searchFilters.maxAmount = filters.maxAmount;
+    if (filters.startDate) searchFilters.startDate = filters.startDate.toISOString().split('T')[0];
+    if (filters.endDate) searchFilters.endDate = filters.endDate.toISOString().split('T')[0];
+    if (filters.year) {
+      searchFilters.year = filters.year;
+    }
+    if (filters.periodName) {
+      searchFilters.periodName = filters.periodName;
+    }
+    if (filters.status) {
+      searchFilters.status = filters.status;
+    }
+    
+    onSearch(searchFilters);
+    onClose();
+  };
+
+  const handleReset = () => {
+    setFilters({
+      type: '',
+      minAmount: '',
+      maxAmount: '',
+      startDate: null,
+      endDate: null,
+      year: null,
+      periodName: null,
+      status: null
+    });
+    onSearch({});
+    onClose();
+  };
+
+  const transactionTypes = [
+    { value: 'DEPOSIT', label: 'ايداع' },
+    { value: 'WITHDRAWAL', label: 'سحب' },
+    { value: 'PROFIT', label: 'ربح' }, 
+  ];
+
+  const transactionStatuses = [
+    { value: 'CANCELED', label: 'ملغي' }
+  ];
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Dialog 
+        open={open} 
+        onClose={onClose}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SearchOutlined />
+            <span>بحث متقدم في المعاملات</span>
+          </Box>
+          <IconButton onClick={onClose}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ mt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>نوع المعاملة</InputLabel>
+              <Select
+                value={filters.type}
+                label="نوع المعاملة"
+                onChange={(e) => handleFilterChange('type', e.target.value)}
+              >
+                {transactionTypes.map((type) => (
+                  <MenuItem key={type.value} value={type.value}>
+                    {type.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Autocomplete
+              value={transactionStatuses.find(s => s.value === filters.status) || null}
+              onChange={(event, newValue) => {
+                handleFilterChange('status', newValue ? newValue.value : null);
+              }}
+              options={transactionStatuses}
+              getOptionLabel={(option) => option.label}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="حالة المعاملة"
+                  fullWidth
+                />
+              )}
+            />
+
+            <Autocomplete
+              value={financialYears.find(y => y.year === filters.year && y.periodName === filters.periodName) || null}
+              onChange={(event, newValue) => {
+                if (newValue) {
+                  handleFilterChange('year', newValue.year);
+                  handleFilterChange('periodName', newValue.periodName);
+                } else {
+                  handleFilterChange('year', null);
+                  handleFilterChange('periodName', null);
+                }
+              }}
+              options={financialYears}
+              getOptionLabel={(option) => `${option.year} - ${option.periodName}`}
+              isOptionEqualToValue={(option, value) => 
+                option.year === value.year && option.periodName === value.periodName
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="السنة المالية"
+                  fullWidth
+                />
+              )}
+            />
+
+            <TextField
+              label="الحد الأدنى للمبلغ"
+              type="number"
+              value={filters.minAmount}
+              onChange={(e) => handleFilterChange('minAmount', e.target.value)}
+              fullWidth
+            />
+            
+            <TextField
+              label="الحد الأقصى للمبلغ"
+              type="number"
+              value={filters.maxAmount}
+              onChange={(e) => handleFilterChange('maxAmount', e.target.value)}
+              fullWidth
+            />
+            
+            <DatePicker
+              label="تاريخ البدء"
+              value={filters.startDate}
+              onChange={(date) => handleFilterChange('startDate', date)}
+              renderInput={(params) => <TextField {...params} fullWidth />}
+            />
+            
+            <DatePicker
+              label="تاريخ الانتهاء"
+              value={filters.endDate}
+              onChange={(date) => handleFilterChange('endDate', date)}
+              renderInput={(params) => <TextField {...params} fullWidth />}
+            />
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 3, gap: 2, flexDirection: 'row-reverse', justifyContent: 'space-between' }}>
+          <Button onClick={handleReset} variant="outlined" color="secondary" startIcon={<ReloadOutlined style={{marginLeft: '10px'}} />}>
+            إعادة تعيين
+          </Button>
+          <Button onClick={handleSearch} variant="contained" color="primary" startIcon={<SearchOutlined style={{marginLeft: '10px'}} />}>
+            بحث
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </LocalizationProvider>
+  );
+};
+
+export default TransactionsSearchModal;
